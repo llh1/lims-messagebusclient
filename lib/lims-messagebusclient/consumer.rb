@@ -76,19 +76,20 @@ module Lims
       # Handler executed if a connection to RabbitMQ fails
       def connection_failure_handler
         Proc.new do |settings|
+          EventMachine.stop if EventMachine.reactor_running?
           raise ConnectionError, "can't connect to RabbitMQ"
         end
       end
-      private :connection_failure_handler
 
       # Handler executed if an authentication to RabbitMQ fails
       def authentication_failure_handler
         Proc.new do |settings|
+          EventMachine.stop if EventMachine.reactor_running?
           raise AuthenticationError, "can't authenticate to RabbitMQ"
         end
       end
-      private :authentication_failure_handler
 
+      private :connection_failure_handler, :authentication_failure_handler
     end
   end
 end
