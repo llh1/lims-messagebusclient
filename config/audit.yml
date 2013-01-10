@@ -1,0 +1,8 @@
+defaults: &defaults
+  audit_file: "audit.txt"
+
+test:
+  <<: *defaults
+
+development:
+  <<: *defaults
