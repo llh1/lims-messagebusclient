@@ -4,6 +4,10 @@ module Lims
   module MessageBusClient
     module Consumer
 
+      # Exception raised if settings are invalid
+      class InvalidSettingsError < StandardError
+      end
+
       # Exception raised after a failed connection to RabbitMQ
       class ConnectionError < StandardError
       end
