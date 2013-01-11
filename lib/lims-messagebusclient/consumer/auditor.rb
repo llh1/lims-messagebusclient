@@ -40,7 +40,6 @@ module Lims
           f.puts("routing key = #{metadata.routing_key}")
           f.puts("content-type = #{metadata.content_type}")
           f.puts(payload)
-          f.puts
         end
       end
       private :write_message
