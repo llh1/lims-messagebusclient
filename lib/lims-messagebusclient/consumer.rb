@@ -2,6 +2,9 @@ require 'common'
 
 module Lims
   module MessageBusClient
+    # A consumer connects to a RabbitMQ broker and receives
+    # messages in its queues. A consumer can deal with several
+    # queues if necessary.
     module Consumer
 
       # Exception raised if settings are invalid
