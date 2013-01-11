@@ -20,6 +20,7 @@ Gem::Specification.new do |s|
 
   # specify any dependencies here; for example:
   # s.add_development_dependency "rspec"
+  s.add_dependency('facets')
   s.add_dependency('virtus')
   s.add_dependency('aequitas')
   s.add_dependency('amqp')

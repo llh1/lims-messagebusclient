@@ -1,5 +1,5 @@
 defaults: &defaults
-  audit_file: "audit.txt"
+  audit_file: "test/audit.txt"
 
 test:
   <<: *defaults
