@@ -2,15 +2,21 @@ require 'lims-messagebusclient/consumer'
 
 module Lims
   module MessageBusClient
+    # The auditor consumer reads all the messages on the
+    # bus. As a result, it defines a single queue with a
+    # routing key '#' which match all the messages available.
+    # The auditor stores all the messages in a file.
     class Auditor
       include Consumer
+      attribute :auditor_name, String, :required => true, :writer => :private
       attribute :audit_file, String, :required => true, :writer => :private
 
       # Initialize the auditor
       # @param [Hash] settings for amqp connection
       # @param [String] audit file path
-      def initialize(amqp_settings, audit_file)
+      def initialize(auditor_name, amqp_settings, audit_file)
         setup(amqp_settings)
+        @auditor_name = auditor_name
         @audit_file = audit_file 
         set_auditor_queue
       end
@@ -19,7 +25,7 @@ module Lims
       # which means it's gonna catch all the messages
       # on the bus. 
       def set_auditor_queue
-        self.add_queue("audit", "#") do |metadata, payload|
+        self.add_queue(auditor_name, "#") do |metadata, payload|
           metadata.ack
           write_message(metadata, payload)
         end
