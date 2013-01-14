@@ -25,7 +25,7 @@ module Lims
       # which means it's gonna catch all the messages
       # on the bus. 
       def set_auditor_queue
-        self.add_queue(auditor_name, "#") do |metadata, payload|
+        self.add_queue(auditor_name, ["#"]) do |metadata, payload|
           metadata.ack
           write_message(metadata, payload)
         end

@@ -51,10 +51,10 @@ module Lims
       # will be available in the queue and processed by the
       # queue handler.
       # @param [String] queue name
-      # @param [String] routing key
+      # @param [Array<String>] routing keys
       # @param [Block] queue handler
-      def add_queue(queue_name, routing_key, &queue_handler)
-        @queues[queue_name] = {:routing_key => routing_key, :queue_handler => queue_handler} 
+      def add_queue(queue_name, routing_keys, &queue_handler)
+        @queues[queue_name] = {:routing_keys => routing_keys, :queue_handler => queue_handler}
       end
 
       # Start the consumer
@@ -74,7 +74,9 @@ module Lims
 
           @queues.each do |queue_name, settings|
             queue = channel.queue(queue_name, :durable => durable)
-            queue.bind(exchange, :routing_key => settings[:routing_key])
+            settings[:routing_keys].each do |routing_key|
+              queue.bind(exchange, :routing_key => routing_key)
+            end
             queue.subscribe(:ack => true, &settings[:queue_handler])
           end
         end
