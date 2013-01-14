@@ -24,6 +24,8 @@ Gem::Specification.new do |s|
   s.add_dependency('virtus')
   s.add_dependency('aequitas')
   s.add_dependency('amqp')
+  s.add_dependency('mysql')
+  s.add_dependency('sequel')
 
   #development
   s.add_development_dependency('rspec', '~> 2.8.0')
