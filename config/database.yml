@@ -1,6 +1,6 @@
 mysql: &MYSQL
   adapter: mysql
-  username: 'root'
+  user: 'root'
   password: 'root'
   host: localhost
   port: 3306
