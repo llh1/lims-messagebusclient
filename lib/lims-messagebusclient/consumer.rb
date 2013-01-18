@@ -36,7 +36,7 @@ module Lims
 
       # Setup the consumer with amqp settings
       # @param [Hash] settings
-      def setup(settings = {})
+      def consumer_setup(settings = {})
         @host = settings["host"]
         @port = settings["port"]
         @user = settings["user"]
