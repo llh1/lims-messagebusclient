@@ -25,10 +25,7 @@ module Lims
         klass.class_eval do
           include Virtus
           include Aequitas
-          attribute :host, String, :required => true, :writer => :private
-          attribute :port, String, :required => true, :writer => :private
-          attribute :user, String, :required => false, :writer => :private
-          attribute :password, String, :required => false, :writer => :private
+          attribute :url, String, :required => true, :writer => :private
           attribute :exchange_name, String, :required => true, :writer => :private
           attribute :durable, String, :required => true, :writer => :private
         end
@@ -37,10 +34,7 @@ module Lims
       # Setup the consumer with amqp settings
       # @param [Hash] settings
       def consumer_setup(settings = {})
-        @host = settings["host"]
-        @port = settings["port"]
-        @user = settings["user"]
-        @password = settings["password"]
+        @url = settings["url"]
         @exchange_name = settings["exchange_name"]
         @durable = settings["durable"] 
         @queues = {} 
@@ -63,11 +57,6 @@ module Lims
       def start
         raise InvalidSettingsError, "settings are invalid" unless valid?
 
-        connection_settings = {:host => host, 
-                               :port => port,
-                               :on_tcp_connection_failure => connection_failure_handler,
-                               :on_possible_authentication_failure => authentication_failure_handler}
-
         AMQP::start(connection_settings) do |connection|
           channel = AMQP::Channel.new(connection)
           exchange = AMQP::Exchange.new(channel, :topic, exchange_name, :durable => durable)
@@ -80,6 +69,14 @@ module Lims
             queue.subscribe(:ack => true, &settings[:queue_handler])
           end
         end
+      end
+
+      # Build the connection settings hash
+      def connection_settings
+        connection_settings = AMQP::Client.parse_connection_uri(url)
+        connection_settings[:on_tcp_connection_failure] = connection_failure_handler
+        connection_settings[:on_possible_authentication_failure] = authentication_failure_handler
+        connection_settings
       end
 
       # Handler executed if a connection to RabbitMQ fails
@@ -98,7 +95,7 @@ module Lims
         end
       end
 
-      private :connection_failure_handler, :authentication_failure_handler
+      private :connection_settings, :connection_failure_handler, :authentication_failure_handler
     end
   end
 end

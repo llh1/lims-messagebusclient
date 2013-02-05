@@ -15,7 +15,7 @@ module Lims
       # @param [Hash] settings for amqp connection
       # @param [String] audit file path
       def initialize(auditor_name, amqp_settings, audit_file)
-        setup(amqp_settings)
+        consumer_setup(amqp_settings)
         @auditor_name = auditor_name
         @audit_file = audit_file 
         set_auditor_queue
