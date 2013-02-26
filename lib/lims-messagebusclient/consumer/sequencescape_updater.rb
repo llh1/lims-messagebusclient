@@ -11,7 +11,7 @@ module Lims::MessageBusClient
       SAMPLE = "Sample"
       STOCK_PLATE_PURPOSE_ID = 2
       UNASSIGNED_PLATE_PURPOSE_ID = 100
-      STOCK_PLATE = "WGS Stock Plate"
+      STOCK_PLATES = ["Stock RNA", "Stock DNA"]
       ITEM_DONE_STATUS = "done"
 
       # Exception raised after an unsuccessful lookup for a plate 
@@ -126,7 +126,7 @@ module Lims::MessageBusClient
       # a stock plate.
       # @param [Hash] non stock plates
       def delete_unassigned_plates_in_sequencescape(s2_items)
-        s2_items.each do |item|
+        s2_items.flatten.each do |item|
           begin
             @db.transaction do
               plate = db[:assets].select(:assets__id).join(

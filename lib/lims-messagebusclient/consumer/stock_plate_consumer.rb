@@ -19,6 +19,7 @@ module Lims
       # Sequencescape database, it means the order message has been received 
       # before the plate creation message. The order message is then requeued 
       # waiting for the plate message to arrive.
+      # Note: S2 tuberacks are treated like plates in Sequencescape.
       class StockPlateConsumer
         include Consumer
         include JsonDecoder
@@ -38,10 +39,11 @@ module Lims
         private
 
         # Define the routing keys we are interested in.
-        # We need messages when a plate is created or
+        # We need messages when a plate/tuberack is created or
         # transfered and when an order is created or updated.
         def routing_keys
           ["*.*.plate.create",
+           "*.*.tuberack.create",
            "*.*.order.create",
            "*.*.order.updateorder",
            "*.*.platetransfer.platetransfer"]
@@ -55,7 +57,8 @@ module Lims
             s2_resource = s2_resource(payload)
 
             # On reception of a plate creation message
-            if metadata.routing_key =~ /plate\.create/
+            # Plate and tuberack are stored in the same place in sequencescape
+            if metadata.routing_key =~ /plate|tuberack\.create/
               plate_message_handler(metadata, s2_resource)       
               # On reception of an order creation/update message
             elsif metadata.routing_key =~ /order\.create|updateorder/
@@ -112,24 +115,41 @@ module Lims
           order = s2_resource[:order]
           order_uuid = s2_resource[:uuid]
 
-          stock_plate_item = order[STOCK_PLATE]
-          other_items = order.keys.keep_if {|k| k != STOCK_PLATE}.map {|k| order[k]}
+          stock_plate_items = stock_plate_items(order)
+          other_items = order.keys.delete_if {|k| STOCK_PLATES.include?(k)}.map {|k| order[k]}
           delete_unassigned_plates_in_sequencescape(other_items)
 
-          if stock_plate_item && stock_plate_item.status == ITEM_DONE_STATUS 
-            begin
-              update_plate_purpose_in_sequencescape(stock_plate_item.uuid)
-            rescue PlateNotFoundInSequencescape => e
-              metadata.reject(:requeue => true)
-            rescue Sequel::Rollback => e
-              metadata.reject(:requeue => true)
-              puts "Error updating plate in Sequencescape: #{e}"
-            else
-              metadata.ack
+          unless stock_plate_items.empty?
+            stock_plate_items.flatten.each do |item|
+              if item.status == ITEM_DONE_STATUS
+                begin
+                  update_plate_purpose_in_sequencescape(item.uuid)
+                rescue PlateNotFoundInSequencescape => e
+                  metadata.reject(:requeue => true)
+                rescue Sequel::Rollback => e
+                  metadata.reject(:requeue => true)
+                  puts "Error updating plate in Sequencescape: #{e}"
+                else
+                  metadata.ack
+                end
+              else
+                metadata.ack
+              end
             end
           else
             metadata.ack
-          end 
+          end
+        end
+
+        # Get all the stock plate items from an order
+        # @param [Lims::Core::Organization::Order] order
+        # @return [Array] stock plate items
+        def stock_plate_items(order)
+          [].tap do |items|
+            STOCK_PLATES.each do |role|
+              items << order[role] if order[role]
+            end
+          end
         end
 
         # When a plate transfer message is received,

@@ -70,14 +70,58 @@ module Lims::MessageBusClient
       end
 
 
+      module TubeRackJsonDecoder
+        # As a tuberack is seen as a plate in sequencescape,
+        # we map below a tuberack to a s2 plate.
+        # Basically, in a tuberack, a tube is mapped to a well,
+        # the content of the tube is mapped to the content of a well.
+        def self.call(json)
+          tuberack_hash = json["tube_rack"]
+          plate = Lims::Core::Laboratory::Plate.new({:number_of_rows => tuberack_hash["number_of_rows"],
+                                                     :number_of_columns => tuberack_hash["number_of_columns"]})
+          tuberack_hash["tubes"].each do |location, tube|
+            tube["aliquots"].each do |aliquot|
+              plate[location] << Lims::Core::Laboratory::Aliquot.new
+            end
+          end
+
+          {:plate => plate,
+           :uuid => tuberack_hash["uuid"],
+           :sample_uuids => sample_uuids(tuberack_hash["tubes"])}
+        end
+
+        # Get the sample uuids in the tuberack
+        # The location returned is the location of the tube
+        # with all its corresponding sample uuids.
+        # @param [Hash] tubes
+        # @return [Hash] sample uuids
+        # @example
+        # {"A1" => ["sample_uuid1", "sample_uuid2"]} 
+        def self.sample_uuids(tubes)
+          {}.tap do |uuids|
+            tubes.each do |location, tube|
+              tube["aliquots"].each do |aliquot|
+                uuids[location] ||= []
+                uuids[location] << aliquot["sample"]["uuid"] if aliquot["sample"]
+              end
+            end
+          end
+        end
+      end
+
+
       module OrderJsonDecoder
         def self.call(json)
           order_h = json["order"]
           order = Lims::Core::Organization::Order.new
           order_h["items"].each do |role, settings|
-            order[role] = Lims::Core::Organization::Order::Item.new({
-              :uuid => settings["uuid"],
-              :status => settings["status"]})
+            settings.each do |s|
+              items = order.fetch(role) { |_| order[role] = [] }
+              items << Lims::Core::Organization::Order::Item.new({
+                :uuid => s["uuid"],
+                :status => s["status"]
+              })
+            end
           end
 
           {:order => order, :uuid => order_h["uuid"]}
