@@ -120,21 +120,26 @@ module Lims
           delete_unassigned_plates_in_sequencescape(other_items)
 
           unless stock_plate_items.empty?
+            success = true
             stock_plate_items.flatten.each do |item|
               if item.status == ITEM_DONE_STATUS
                 begin
                   update_plate_purpose_in_sequencescape(item.uuid)
                 rescue PlateNotFoundInSequencescape => e
-                  metadata.reject(:requeue => true)
+                  success = false
+                  puts "Plate not found in Sequencescape: #{e}"
                 rescue Sequel::Rollback => e
-                  metadata.reject(:requeue => true)
+                  success = false
                   puts "Error updating plate in Sequencescape: #{e}"
                 else
-                  metadata.ack
+                  success = success && true
                 end
-              else
-                metadata.ack
               end
+            end
+            if success
+              metadata.ack
+            else
+              metadata.reject(:requeue => true)
             end
           else
             metadata.ack
