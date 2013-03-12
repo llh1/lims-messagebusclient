@@ -19,6 +19,8 @@ module Lims
       class AuthenticationError < StandardError
       end
 
+      RECONNECT_INTERVAL = 30
+
       # Define the parameters needed to connect to RabbitMQ
       # and to setup the exchange.
       def self.included(klass)
@@ -47,7 +49,10 @@ module Lims
       # @param [String] queue name
       # @param [Array<String>] routing keys
       # @param [Block] queue handler
-      def add_queue(queue_name, routing_keys, &queue_handler)
+      def add_queue(queue_name, routing_keys = [], &queue_handler)
+        routing_keys.each do |routing_key|
+          raise InvalidSettingsError, "routing keys are not in the right format" unless RoutingKey.valid?(routing_key)
+        end
         @queues[queue_name] = {:routing_keys => routing_keys, :queue_handler => queue_handler}
       end
 
@@ -58,16 +63,26 @@ module Lims
         raise InvalidSettingsError, "settings are invalid" unless valid?
 
         AMQP::start(connection_settings) do |connection|
-          channel = AMQP::Channel.new(connection)
-          exchange = AMQP::Exchange.new(channel, :topic, exchange_name, :durable => durable)
+          setup_consumer_termination(connection)
+          setup_reconnection(connection)
+          build(connection)
+        end
+      end
 
-          @queues.each do |queue_name, settings|
-            queue = channel.queue(queue_name, :durable => durable)
-            settings[:routing_keys].each do |routing_key|
-              queue.bind(exchange, :routing_key => routing_key)
-            end
-            queue.subscribe(:ack => true, &settings[:queue_handler])
+      private
+
+      # Build the consumer
+      # @param [AMQP::Session] connection
+      def build(connection)
+        channel = AMQP::Channel.new(connection)
+        exchange = AMQP::Exchange.new(channel, :topic, exchange_name, :durable => durable)
+
+        @queues.each do |queue_name, settings|
+          queue = channel.queue(queue_name, :durable => durable)
+          settings[:routing_keys].each do |routing_key|
+            queue.bind(exchange, :routing_key => routing_key)
           end
+          queue.subscribe(:ack => true, &settings[:queue_handler])
         end
       end
 
@@ -95,7 +110,36 @@ module Lims
         end
       end
 
-      private :connection_settings, :connection_failure_handler, :authentication_failure_handler
+      # Handler executed after a connection loss. 
+      # Try periodically to reconnect and setup the connection.
+      def setup_reconnection(connection)
+        connection.on_error do |conn, connection_close|
+          if connection_close.reply_code == 320
+            connection.periodically_reconnect(RECONNECT_INTERVAL)
+          end
+        end
+
+        connection.on_recovery do
+          build(connection)          
+        end
+      end
+
+      # Handler for terminate the consumer
+      def setup_consumer_termination(connection)
+        ['TERM', 'INT'].each do |signal|
+          Signal.trap(signal) do
+            connection.close { EventMachine.stop }
+          end
+        end
+      end
+
+      module RoutingKey
+        ValidationRegex = /^(\w+|\*|#)(\.(\w+|\*|#))*$/
+
+        def self.valid?(routing_key)
+          ValidationRegex.match(routing_key)
+        end
+      end
     end
   end
 end
