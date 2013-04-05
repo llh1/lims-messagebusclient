@@ -2,6 +2,7 @@ defaults: &defaults
   url: "amqp://localhost:5672"
   exchange_name: "S2.exchange"
   durable: true
+  empty_queue_disconnect_interval: 2
 
 test:
   <<: *defaults

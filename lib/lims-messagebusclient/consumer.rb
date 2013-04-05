@@ -30,6 +30,7 @@ module Lims
           attribute :url, String, :required => true, :writer => :private
           attribute :exchange_name, String, :required => true, :writer => :private
           attribute :durable, String, :required => true, :writer => :private
+          attribute :empty_queue_disconnect_interval, Numeric, :required => false, :writer => :private
         end
       end
 
@@ -39,6 +40,7 @@ module Lims
         @url = settings["url"]
         @exchange_name = settings["exchange_name"]
         @durable = settings["durable"] 
+        @empty_queue_disconnect_interval = settings["empty_queue_disconnect_interval"] || 0
         @queues = {} 
       end
 
@@ -63,7 +65,7 @@ module Lims
         raise InvalidSettingsError, "settings are invalid" unless valid?
 
         AMQP::start(connection_settings) do |connection|
-          setup_consumer_termination(connection)
+          setup_manual_termination(connection)
           setup_reconnection(connection)
           build(connection)
         end
@@ -79,6 +81,7 @@ module Lims
 
         @queues.each do |queue_name, settings|
           queue = channel.queue(queue_name, :durable => durable)
+          setup_automatic_termination(connection, queue)
           settings[:routing_keys].each do |routing_key|
             queue.bind(exchange, :routing_key => routing_key)
           end
@@ -125,12 +128,26 @@ module Lims
       end
 
       # Handler for terminate the consumer
-      def setup_consumer_termination(connection)
+      def setup_manual_termination(connection)
         ['TERM', 'INT'].each do |signal|
           Signal.trap(signal) do
             connection.close { EventMachine.stop }
           end
         end
+      end
+
+      # Terminate the consumer after a time defined in
+      # empty_queue_disconnect_interval variable. 
+      # If 0, it doesn't terminate if there is no 
+      # message in the queue.
+      def setup_automatic_termination(connection, queue)
+        EventMachine.add_periodic_timer(empty_queue_disconnect_interval) do
+          queue.status do |number_of_messages, _|
+            if number_of_messages.zero?
+              connection.close { EventMachine.stop }
+            end
+          end
+        end unless empty_queue_disconnect_interval.zero?
       end
 
       module RoutingKey
