@@ -64,7 +64,7 @@ module Lims
       def start
         raise InvalidSettingsError, "settings are invalid" unless valid?
 
-        AMQP::start(connection_settings) do |connection|
+        ::AMQP::start(connection_settings) do |connection|
           setup_manual_termination(connection)
           setup_reconnection(connection)
           build(connection)
@@ -76,8 +76,8 @@ module Lims
       # Build the consumer
       # @param [AMQP::Session] connection
       def build(connection)
-        channel = AMQP::Channel.new(connection)
-        exchange = AMQP::Exchange.new(channel, :topic, exchange_name, :durable => durable)
+        channel = ::AMQP::Channel.new(connection)
+        exchange = ::AMQP::Exchange.new(channel, :topic, exchange_name, :durable => durable)
 
         @queues.each do |queue_name, settings|
           queue = channel.queue(queue_name, :durable => durable)
@@ -91,7 +91,7 @@ module Lims
 
       # Build the connection settings hash
       def connection_settings
-        connection_settings = AMQP::Client.parse_connection_uri(url)
+        connection_settings = ::AMQP::Client.parse_connection_uri(url)
         connection_settings[:on_tcp_connection_failure] = connection_failure_handler
         connection_settings[:on_possible_authentication_failure] = authentication_failure_handler
         connection_settings
